@@ -1,10 +1,13 @@
 /*App.jsx*/
+/App.jsx/
 import React, { useEffect, useState } from 'react';
-import { getNotes, createNote, deleteNote } from './api';
+import { getNotes, createNote, updateNote, deleteNote } from './api';
 
 function App() {
   const [notes, setNotes] = useState([]);
-  const [newNote, setNewNote] = useState({ title: '', content: '' });
+  const [noteForm, setNoteForm] = useState({ title: '', content: '', tags: [] });
+  const [tagInput, setTagInput] = useState('');
+  const [editingNoteId, setEditingNoteId] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -20,19 +23,37 @@ function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const tags = tagInput
+      .split(',')
+      .map((tag) => ({ name: tag.trim() }))
+      .filter((tag) => tag.name);
+
     try {
-      const note = await createNote(newNote);
-      setNotes([...notes, note]);
-      setNewNote({ title: '', content: '' });
+      if (editingNoteId) {
+        const updatedNote = await updateNote(editingNoteId, { ...noteForm, tags });
+        setNotes(notes.map((note) => (note.id === editingNoteId ? updatedNote : note)));
+        setEditingNoteId(null);
+      } else {
+        const newNote = await createNote({ ...noteForm, tags });
+        setNotes([...notes, newNote]);
+      }
+      setNoteForm({ title: '', content: '', tags: [] });
+      setTagInput('');
     } catch (error) {
       console.error(error);
     }
   };
 
+  const handleEdit = (note) => {
+    setNoteForm({ title: note.title, content: note.content });
+    setTagInput(note.tags.map((tag) => tag.name).join(', '));
+    setEditingNoteId(note.id);
+  };
+
   const handleDelete = async (id) => {
     try {
       await deleteNote(id);
-      setNotes(notes.filter((n) => n.id !== id));
+      setNotes(notes.filter((note) => note.id !== id));
     } catch (error) {
       console.error(error);
     }
@@ -46,16 +67,25 @@ function App() {
           type="text"
           placeholder="Title"
           className="w-full p-2 border rounded"
-          value={newNote.title}
-          onChange={(e) => setNewNote({ ...newNote, title: e.target.value })}
+          value={noteForm.title}
+          onChange={(e) => setNoteForm({ ...noteForm, title: e.target.value })}
         />
         <textarea
           placeholder="Content"
           className="w-full p-2 border rounded"
-          value={newNote.content}
-          onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
+          value={noteForm.content}
+          onChange={(e) => setNoteForm({ ...noteForm, content: e.target.value })}
         />
-        <button className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Add Note</button>
+        <input
+          type="text"
+          placeholder="Tags (comma separated)"
+          className="w-full p-2 border rounded"
+          value={tagInput}
+          onChange={(e) => setTagInput(e.target.value)}
+        />
+        <button className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+          {editingNoteId ? 'Update Note' : 'Add Note'}
+        </button>
       </form>
 
       <div className="mt-8 space-y-4">
@@ -63,12 +93,30 @@ function App() {
           <div key={note.id} className="p-4 border rounded shadow">
             <h2 className="text-xl font-semibold">{note.title}</h2>
             <p>{note.content}</p>
-            <button
-              onClick={() => handleDelete(note.id)}
-              className="mt-2 text-sm text-red-500 hover:underline"
-            >
-              Delete
-            </button>
+            <div className="mt-2">
+              {note.tags.map((tag) => (
+                <span
+                  key={tag.id}
+                  className="inline-block bg-gray-200 text-gray-700 px-2 py-1 mr-2 rounded"
+                >
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+            <div className="mt-2 space-x-2">
+              <button
+                onClick={() => handleEdit(note)}
+                className="text-sm text-green-500 hover:underline"
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => handleDelete(note.id)}
+                className="text-sm text-red-500 hover:underline"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -77,7 +125,6 @@ function App() {
 }
 
 export default App;
-
 
 /*import { useState } from 'react'
 import reactLogo from './assets/react.svg'
